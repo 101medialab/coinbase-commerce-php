@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php: '8.3'
+            guzzle: '^6.5'
+            psr7: '^1.9'
+            legacy: true
+          - php: '8.3'
+            guzzle: '^7.0'
+            psr7: '^1.9'
+            legacy: true
+          - php: '8.3'
+            guzzle: '^7.0'
+            psr7: '^2.0'
+            legacy: false
+    name: PHP ${{ matrix.php }} / Guzzle ${{ matrix.guzzle }} / PSR7 ${{ matrix.psr7 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+      - name: Install dependencies
+        env:
+          LEGACY: ${{ matrix.legacy }}
+        run: |
+          # Legacy versions have advisories; bypass blocking only in these test jobs.
+          flags=()
+          if [ "$LEGACY" = "true" ]; then flags+=(--no-security-blocking); fi
+          composer update --no-interaction --prefer-dist --no-progress \
+            --with 'guzzlehttp/guzzle:${{ matrix.guzzle }}' \
+            --with 'guzzlehttp/psr7:${{ matrix.psr7 }}' "${flags[@]}"
+      - run: composer test
